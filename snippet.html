@@ -1,0 +1,223 @@
+<strong id="bytecount" style="display:inline; font-size:32px; font-family:Helvetica"></strong>
+
+<strong id="bytediff" style="display:inline; margin-left:10px; font-size:32px; font-family:Helvetica; color:lightgray"></strong>
+
+<br>
+<br>
+
+<pre style="margin:0">Code:</pre>
+
+<textarea id="textbox" style="margin-top:5px; margin-bottom:5px"></textarea>
+
+<br>
+
+<pre style="margin:0">Input:</pre>
+
+<textarea id="inputbox" style="margin-top:5px; margin-bottom:5px"></textarea>
+
+<br>
+
+<button id="testbtn">Test!</button>
+
+<button id="resetbtn">Reset</button>
+
+<br>
+
+<p><strong id="origheader" style="font-family:Helvetica; display:none">Original Code Output:</strong><p>
+<div id="origoutput" style="margin-left:15px"></div>
+
+<p><strong id="newheader" style="font-family:Helvetica; display:none">New Code Output:</strong><p>
+<div id="newoutput" style="margin-left:15px"></div>
+
+<script type="text/javascript" id="golfsnippet">
+
+var bytecount = document.getElementById("bytecount");
+var bytediff = document.getElementById("bytediff");
+var textbox = document.getElementById("textbox");
+var inputbox = document.getElementById("inputbox");
+var testbtn = document.getElementById("testbtn");
+var resetbtn = document.getElementById("resetbtn");
+var origheader = document.getElementById("origheader");
+var newheader = document.getElementById("newheader");
+var origoutput = document.getElementById("origoutput");
+var newoutput = document.getElementById("newoutput");
+
+textbox.style.width = inputbox.style.width = window.innerWidth - 50 + "px";
+
+var _originalCode = null;
+function getOriginalCode () {
+  if(_originalCode != null)
+    return _originalCode;
+
+  var allScripts = document.getElementsByTagName("script");
+  for(var i = 0; i < allScripts.length; i++) {
+    var script = allScripts[i];
+    if(script.id != "golfsnippet") {
+      originalCode = script.textContent.trim();
+      return originalCode;
+    }
+  }
+}
+
+function getNewCode () {
+  return textbox.value.trim();
+}
+
+function getInput () {
+  try {
+    var inputText = inputbox.value.trim();
+    var input = eval("[" + inputText + "]");
+    return input;
+  }
+  catch (e) {
+    return null;
+  }
+}
+
+function setTextbox (s) {
+  textbox.value = s;
+  onTextboxChange();
+}
+
+function setOutput (output, s) {
+  output.innerHTML = s;
+}
+
+function addOutput (output, data) {
+  output.innerHTML += '<pre style="background-color:' + (data.type == "err" ? "lightcoral" : "lightgray") + '">' + escape(data.content) + "</pre>";
+}
+
+function getByteCount (s) {
+  return new Blob([s], {encoding:"UTF-8", type:"text/plain;charset=UTF-8"}).size;
+}
+
+function onTextboxChange () {
+  var newLength = getByteCount(getNewCode());
+  var oldLength = getByteCount(getOriginalCode());
+  bytecount.innerHTML = newLength + " bytes";
+  var diff = newLength - oldLength;
+  if(diff > 0) {
+    bytediff.innerHTML = "(+" + diff + ")";
+    bytediff.style.color = "lightcoral";
+  }
+  else if(diff < 0) {
+    bytediff.innerHTML = "(" + diff + ")";
+    bytediff.style.color = "lightgreen";
+  }
+  else {
+    bytediff.innerHTML = "(" + diff + ")";
+    bytediff.style.color = "lightgray";
+  }
+}
+
+function onTestBtn (evt) {
+  origheader.style.display = "inline";
+  newheader.style.display = "inline";
+  setOutput(newoutput, "");
+  setOutput(origoutput, "");
+  var input = getInput();
+  if(input === null) {
+    addOutput(origoutput, {type:"err", content:"Input is malformed. Using no input."});
+    addOutput(newoutput, {type:"err", content:"Input is malformed. Using no input."});
+    input = [];
+  }
+  doInterpret(getNewCode(), input, function (data) {  
+    addOutput(newoutput, data);
+  });
+  doInterpret(getOriginalCode(), input, function (data) {
+    addOutput(origoutput, data);
+  });
+  evt.stopPropagation();
+  return false;
+}
+
+function onResetBtn (evt) {
+  setTextbox(getOriginalCode());
+  origheader.style.display = "none";
+  newheader.style.display = "none";
+  setOutput(origoutput, "");
+  setOutput(newoutput, "");
+}
+
+function escape (s) {
+  return s.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+window.alert = function () {}
+window.prompt = function () {}
+
+
+function doInterpret (code, input, cb) {
+
+  var workerCode = interpret.toString() +
+                   ";function stdout(s){ self.postMessage( {'type': 'out', 'content': s} ); }" +
+                   " function stderr(s){ self.postMessage( {'type': 'err', 'content': s} ); }" +
+                   " function kill(){ self.close(); }" +
+                   " self.addEventListener('message', function(msg){ interpret(msg.data.code, msg.data.input); });"
+
+  var interpreter = new Worker(URL.createObjectURL(new Blob([workerCode])));
+
+  interpreter.addEventListener("message", function (msg) {
+    cb(msg.data);
+  });
+
+  interpreter.postMessage({"code": code, "input": input});
+  
+  setTimeout(function () {
+    interpreter.terminate();
+  }, 10000);
+}
+
+setTimeout(function () {
+
+  getOriginalCode();
+  
+  textbox.addEventListener("input", onTextboxChange);
+  
+  testbtn.addEventListener("click", onTestBtn);
+  resetbtn.addEventListener("click", onResetBtn);
+
+  setTextbox(getOriginalCode());
+
+}, 100);
+
+
+function interpret (code, input) {
+
+  window = {};
+  alert = function (s) {
+    stdout(s);
+  }
+  window.alert = alert;
+  console.log = alert;
+
+  prompt = function (s) {
+    if(input.length < 1)
+      stderr("not enough input");
+    else {
+      var nextInput = input[0];
+      input = input.slice(1);
+      return nextInput.toString();
+    }
+  }
+  window.prompt = prompt;
+
+
+  (function () {
+    try {
+      var evalResult = eval(code);
+
+      if(typeof evalResult == "function") {
+        var callResult = evalResult.apply(this, input);
+        if(typeof callResult != "undefined")
+          stdout(callResult);
+      }
+    }
+    catch (e) {
+      stderr(e.message);
+    }
+  })();
+
+}
+
+</script>
