@@ -1,3 +1,5 @@
-A golf snippet for PPCG StackExchange
+#golf-snippet
 
-http://meta.codegolf.stackexchange.com/questions/7113
+*A golf snippet for PPCG StackExchange.*
+
+###Details [here](http://meta.codegolf.stackexchange.com/questions/7113)
